@@ -1,0 +1,52 @@
+---
+- name: install soft
+  hosts: node
+  vars:
+    package:
+      - wget
+      - tree
+      - bash-completion
+      - lrzsz
+      - psmisc
+      - net-tools
+      - vim
+      - chrony
+      - ipset
+      - ipvsadm
+  tasks:
+    - yum:
+        name: "{{ package }}"
+        state: latest
+
+- name: config chronyd
+  hosts: node
+  tasks:
+    - service:
+        name: chronyd
+        state: started
+    - shell: sed -i -e '/^server/s/^/# /' -e '$ a\server ntp1.aliyun.com iburst' /etc/chrony.conf
+    - service:
+        name: chronyd
+        state: restarted
+    - shell: chronyc sources
+
+- name: swapoff
+  hosts: node
+  tasks:
+    - shell: swapoff -a && sed -i 's/.*swap.*/#&/' /etc/fstab
+
+- name: sysctl
+  hosts: node
+  tasks:
+    - copy:
+        src: /root/k8s/sysctl
+        dest: /root
+    - shell: cat /root/sysctl > /etc/sysctl.conf && modprobe br_netfilter &&  modprobe overlay && sysctl -p
+
+- name: ipvs
+  hosts: node
+  tasks:
+    - copy:
+        src: /root/k8s/ipvs
+        dest: /root
+    - shell: cat /root/ipvs > /etc/sysconfig/modules/ipvs.modules && chmod +x /etc/sysconfig/modules/ipvs.modules && /bin/bash /etc/sysconfig/modules/ipvs.modules

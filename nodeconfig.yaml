@@ -1,0 +1,52 @@
+---
+- name: install k8s
+  hosts: node
+  vars:
+    package:
+      - kubeadm
+      - kubelet
+      - kubectl
+  tasks:
+    - copy:
+        src: /root/k8s/k8s-image
+        dest: /etc/yum.repos.d/kubernetes.repo
+    - yum: 
+        name: "{{ package }}"
+        state: latest
+    - shell: echo  'KUBELET_EXTRA_ARGS="--cgroup-driver=systemd" \
+                    KUBE_PROXY_MODE="ipvs"' /etc/sysconfig/kubelet
+    - service:
+        name: kubelet
+        state: started
+
+- name: install containerd
+  hosts: node
+  vars:
+    package:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+  tasks:
+    - yum:
+        name: "{{ package }}"
+        state: latest
+    - shell: yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+    - shell: sed -i 's+download.docker.com+mirrors.aliyun.com/docker-ce+' /etc/yum.repos.d/docker-ce.repo
+    - yum:
+        name: containerd
+        state: latest
+    - shell: containerd config default | tee /etc/containerd/config.toml
+    - shell: sed -i "s#SystemdCgroup\ \=\ false#SystemdCgroup\ \=\ true#g" /etc/containerd/config.toml
+    - shell: sed -i "s#registry.k8s.io#registry.aliyuncs.com/google_containers#g" /etc/containerd/config.toml
+
+- name: pull image
+  hosts: node
+  tasks:
+    - copy:
+        src: /root/k8s/crictl
+        dest: /root
+    - shell: cat /root/crictl > /etc/crictl.yaml
+    - shell: systemctl daemon-reload
+    - service:
+        name: containerd
+        state: started

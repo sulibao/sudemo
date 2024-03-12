@@ -1,0 +1,29 @@
+---
+- name: hosts-config
+  hosts: node
+  tasks:
+    - name: copy hostfile
+      copy:
+        src: /root/k8s/host-config
+        dest: /root
+    - name: add hostfile
+      shell: cat /root/host-config >> /etc/hosts
+
+- name: stop firewalld
+  hosts: node
+  tasks:
+    - name: stop it
+      service:
+        name: firewalld
+        state: stopped
+
+- name: change selinux
+  hosts: node
+  tasks:
+    - name: change it
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: SELINUX=disabled
+    - name: restart hosts
+      reboot: 
